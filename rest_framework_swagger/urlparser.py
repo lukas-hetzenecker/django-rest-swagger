@@ -49,7 +49,7 @@ class UrlParser(object):
                 if top + '/' in api['path'].lstrip("/"):
                     remove = True
 
-            if filter_path in api['path'].strip("/") and not remove:
+            if filter_path + '/' in api['path'].strip("/") and not remove:
                 filtered_list.append(api)
 
         return filtered_list
