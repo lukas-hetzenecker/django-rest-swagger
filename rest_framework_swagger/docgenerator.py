@@ -192,7 +192,10 @@ class DocumentationGenerator(object):
         path_params = self.__build_path_parameters__(api['path'])
         body_params = self.__build_body_parameters__(api['callback'])
         form_params = self.__build_form_parameters__(api['callback'], method)
-        query_params = self.__build_query_params_from_docstring__(api['callback'], method)
+        query_params = self.__build_query_params_from_method_docstring__(api['callback'], method)
+        params += query_params
+        query_params = self.__build_query_params_from_class_docstring__(api['callback'])
+        params += query_params
 
         if path_params:
             params += path_params
@@ -202,9 +205,6 @@ class DocumentationGenerator(object):
 
             if not form_params and body_params is not None:
                 params.append(body_params)
-
-        if query_params:
-            params += query_params
 
         return params
 
@@ -278,30 +278,30 @@ class DocumentationGenerator(object):
 
         return data
 
-    def __build_query_params_from_docstring__(self, callback, method=None):
+    def __build_query_params_from_method_docstring__(self, callback, method):
+        docstring = self.__eval_method_docstring_(callback, method)
+        return self.__build_query_params_from_docstring__(docstring)
 
+    def __build_query_params_from_class_docstring__(self, callback):
+        docstring = get_view_description(callback)
+        return self.__build_query_params_from_docstring__(docstring)
+
+    def __build_query_params_from_docstring__(self, docstring):
         params = []
-        # Combine class & method level comments. If parameters are specified
-        if method is not None:
-            docstring = self.__eval_method_docstring_(callback, method)
-            params += self.__build_query_params_from_docstring__(callback)
-        else: # Otherwise, get the class level docstring
-            docstring = get_view_description(callback)
+        if docstring is not None:
 
-        if docstring is None:
-            return params
+            split_lines = docstring.split('\n')
 
-        split_lines = docstring.split('\n')
-
-        for line in split_lines:
-            param = line.split(' -- ')
-            if len(param) == 2:
-                params.append({
-                    'paramType': 'query',
-                    'name': param[0].strip(),
-                    'description': param[1].strip(),
-                    'dataType': '',
-                })
+            for line in split_lines:
+                param = line.split(' -- ')
+                if len(param) == 2:
+                    params.append({
+                        'paramType': 'query',
+                        'name': param[0].strip(),
+                        'description': param[1].strip(),
+                        'dataType': '',
+                        'required': False,
+                    })
 
         return params
 
