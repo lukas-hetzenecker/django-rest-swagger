@@ -54,7 +54,7 @@ class UrlParser(object):
 
         return filtered_list
 
-    def get_top_level_apis(self, apis):
+    def get_top_level_apis(self, apis, resource_url_prefix=None):
         """
         Returns the 'top level' APIs (ie. swagger 'resources')
 
@@ -65,8 +65,11 @@ class UrlParser(object):
         api_paths = [endpoint['path'].strip("/") for endpoint in apis]
 
         for path in api_paths:
-            if '{' in path:
+            if '{' in path and resource_url_prefix is None:
                 continue
+            if resource_url_prefix is not None:
+                path = path.replace(resource_url_prefix, '', 1)
+                path = path.split('/')[0]
             root_paths.add(path)
 
         return root_paths
