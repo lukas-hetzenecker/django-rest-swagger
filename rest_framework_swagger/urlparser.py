@@ -44,12 +44,7 @@ class UrlParser(object):
                 top_level_apis.remove(top)
 
         for api in all_apis:
-            remove = False
-            for top in top_level_apis:
-                if top + '/' in api['path'].lstrip("/"):
-                    remove = True
-
-            if filter_path + '/' in api['path'].strip("/") and not remove:
+            if filter_path + '/' in api['path']:
                 filtered_list.append(api)
 
         return filtered_list
