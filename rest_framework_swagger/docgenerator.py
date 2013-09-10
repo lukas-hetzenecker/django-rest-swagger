@@ -141,7 +141,11 @@ class DocumentationGenerator(object):
         else:
             docstring = trim_docstring(get_view_description(callback))
 
+        # Remove any special keywords from the docstring
+        docstring = docstring.replace("[overwrite]", "")
+
         docstring = self.__strip_params_from_docstring__(docstring)
+
         docstring = docstring.replace("\n", "<br/>")
 
         return docstring
@@ -192,7 +196,15 @@ class DocumentationGenerator(object):
         path_params = self.__build_path_parameters__(api['path'])
         body_params = self.__build_body_parameters__(api['callback'])
         form_params = self.__build_form_parameters__(api['callback'], method)
-        query_params = self.__build_query_params_from_docstring__(api['callback'], method)
+        query_params, overwrite = self.__build_query_params_from_method_docstring__(api['callback'], method)
+        params += query_params
+        if overwrite:
+            return params
+
+        query_params, overwrite = self.__build_query_params_from_class_docstring__(api['callback'])
+        params += query_params
+        if overwrite:
+            return params
 
         if path_params:
             params += path_params
@@ -202,9 +214,6 @@ class DocumentationGenerator(object):
 
             if not form_params and body_params is not None:
                 params.append(body_params)
-
-        if query_params:
-            params += query_params
 
         return params
 
@@ -278,32 +287,48 @@ class DocumentationGenerator(object):
 
         return data
 
-    def __build_query_params_from_docstring__(self, callback, method=None):
+    def __build_query_params_from_method_docstring__(self, callback, method):
+        docstring = self.__eval_method_docstring_(callback, method)
+        return self.__build_query_params_from_docstring__(docstring)
 
+    def __build_query_params_from_class_docstring__(self, callback):
+        docstring = get_view_description(callback)
+        return self.__build_query_params_from_docstring__(docstring)
+
+    def __build_query_params_from_docstring__(self, docstring):
         params = []
-        # Combine class & method level comments. If parameters are specified
-        if method is not None:
-            docstring = self.__eval_method_docstring_(callback, method)
-            params += self.__build_query_params_from_docstring__(callback)
-        else: # Otherwise, get the class level docstring
-            docstring = get_view_description(callback)
+        overwrite = False
+        if docstring is not None:
+            overwrite = "[overwrite]" in docstring
+            split_lines = docstring.split('\n')
 
-        if docstring is None:
-            return params
+            for line in split_lines:
+                param = line.split(' -- ')
+                if len(param) == 2:
+                    description = param[1]
+                    paramType = 'query'
+                    dataType = 'string'
+                    if '[body]' in description:
+                        paramType = 'body'
+                    elif '[file]' in description:
+                        paramType = 'body'
+                        dataType = 'file'
 
-        split_lines = docstring.split('\n')
+                    required = '[required]' in description
 
-        for line in split_lines:
-            param = line.split(' -- ')
-            if len(param) == 2:
-                params.append({
-                    'paramType': 'query',
-                    'name': param[0].strip(),
-                    'description': param[1].strip(),
-                    'dataType': '',
-                })
+                    description = description.replace('[body]', '')
+                    description = description.replace('[file]', '')
+                    description = description.replace('[required]', '')
 
-        return params
+                    params.append({
+                        'paramType': paramType,
+                        'name': param[0].strip(),
+                        'description': description.strip(),
+                        'dataType': dataType,
+                        'required': required,
+                    })
+
+        return params, overwrite
 
     def __get_serializer_fields__(self, serializer):
         """
