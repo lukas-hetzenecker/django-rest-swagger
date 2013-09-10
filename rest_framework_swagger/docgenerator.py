@@ -141,7 +141,11 @@ class DocumentationGenerator(object):
         else:
             docstring = trim_docstring(get_view_description(callback))
 
+        # Remove any special keywords from the docstring
+        docstring = docstring.replace("[overwrite]", "")
+
         docstring = self.__strip_params_from_docstring__(docstring)
+
         docstring = docstring.replace("\n", "<br/>")
 
         return docstring
@@ -192,10 +196,15 @@ class DocumentationGenerator(object):
         path_params = self.__build_path_parameters__(api['path'])
         body_params = self.__build_body_parameters__(api['callback'])
         form_params = self.__build_form_parameters__(api['callback'], method)
-        query_params = self.__build_query_params_from_method_docstring__(api['callback'], method)
+        query_params, overwrite = self.__build_query_params_from_method_docstring__(api['callback'], method)
         params += query_params
-        query_params = self.__build_query_params_from_class_docstring__(api['callback'])
+        if overwrite:
+            return params
+
+        query_params, overwrite = self.__build_query_params_from_class_docstring__(api['callback'])
         params += query_params
+        if overwrite:
+            return params
 
         if path_params:
             params += path_params
@@ -288,8 +297,9 @@ class DocumentationGenerator(object):
 
     def __build_query_params_from_docstring__(self, docstring):
         params = []
+        overwrite = False
         if docstring is not None:
-
+            overwrite = "[overwrite]" in docstring
             split_lines = docstring.split('\n')
 
             for line in split_lines:
@@ -303,7 +313,7 @@ class DocumentationGenerator(object):
                         'required': False,
                     })
 
-        return params
+        return params, overwrite
 
     def __get_serializer_fields__(self, serializer):
         """
