@@ -305,10 +305,17 @@ class DocumentationGenerator(object):
             for line in split_lines:
                 param = line.split(' -- ')
                 if len(param) == 2:
+                    description = param[1]
+                    paramType = 'query'
+                    if '[body]' in description:
+                        paramType = 'body'
+
+                    description = description.replace('[body]', '')
+
                     params.append({
-                        'paramType': 'query',
+                        'paramType': paramType,
                         'name': param[0].strip(),
-                        'description': param[1].strip(),
+                        'description': description.strip(),
                         'dataType': '',
                         'required': False,
                     })
