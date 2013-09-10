@@ -6,6 +6,7 @@ from django.contrib.admindocs.utils import trim_docstring
 from rest_framework import viewsets
 from rest_framework.utils.formatting import get_view_name, \
         get_view_description
+from rest_framework import serializers
 
 
 class DocumentationGenerator(object):
@@ -172,8 +173,13 @@ class DocumentationGenerator(object):
 
         models = {}
 
-        for serializer in serializers:
-            properties = self.__get_serializer_fields__(serializer)
+        while serializers:
+            serializer = serializers.pop()
+
+            properties, extra_serializers = self.__get_serializer_fields__(serializer)
+            for extra_serializer in extra_serializers:
+                if extra_serializer.__name__ not in models:
+                    serializers.add(extra_serializer)
 
             models[serializer.__name__] = {
                 'id': serializer.__name__,
@@ -309,16 +315,22 @@ class DocumentationGenerator(object):
         """
         Returns serializer fields in the Swagger MODEL format
         """
+        data = {}
+        extra_serializers = set()
+
         if serializer is None:
-            return
+            return data, extra_serializers
 
         fields = serializer().get_fields()
 
-        data = {}
         for name, field in fields.items():
+            type_label = field.type_label
+            if isinstance(field, serializers.Serializer):
+                extra_serializers.add(field.__class__)
+                type_label = field.__class__.__name__
 
             data[name] = {
-                'type': field.type_label,
+                'type': type_label,
                 'required': getattr(field, 'required', None),
                 'allowableValues': {
                     'min': getattr(field, 'min_length', None),
@@ -329,7 +341,7 @@ class DocumentationGenerator(object):
                 }
             }
 
-        return data
+        return data, extra_serializers
 
     def __get_serializer_class__(self, callback):
         if hasattr(callback, 'get_serializer_class'):
