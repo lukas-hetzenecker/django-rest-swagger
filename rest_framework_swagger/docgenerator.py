@@ -314,15 +314,18 @@ class DocumentationGenerator(object):
                         paramType = 'body'
                         dataType = 'file'
 
+                    required = '[required]' in description
+
                     description = description.replace('[body]', '')
                     description = description.replace('[file]', '')
+                    description = description.replace('[required]', '')
 
                     params.append({
                         'paramType': paramType,
                         'name': param[0].strip(),
                         'description': description.strip(),
                         'dataType': dataType,
-                        'required': False,
+                        'required': required,
                     })
 
         return params, overwrite
