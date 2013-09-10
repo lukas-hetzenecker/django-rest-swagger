@@ -307,16 +307,21 @@ class DocumentationGenerator(object):
                 if len(param) == 2:
                     description = param[1]
                     paramType = 'query'
+                    dataType = 'string'
                     if '[body]' in description:
                         paramType = 'body'
+                    elif '[file]' in description:
+                        paramType = 'body'
+                        dataType = 'file'
 
                     description = description.replace('[body]', '')
+                    description = description.replace('[file]', '')
 
                     params.append({
                         'paramType': paramType,
                         'name': param[0].strip(),
                         'description': description.strip(),
-                        'dataType': '',
+                        'dataType': dataType,
                         'required': False,
                     })
 
