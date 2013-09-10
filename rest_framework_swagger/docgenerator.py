@@ -42,7 +42,7 @@ class DocumentationGenerator(object):
                 'summary': self.__get_method_docs__(callback, method),
                 'nickname': self.__get_nickname__(callback),
                 'notes': self.__get_notes__(callback, method),
-                'responseClass': self.__get_serializer_class_name__(callback),
+                'responseClass': self.__get_serializer_class_name__(self.__get_response_serializer_class__(callback)),
             }
 
             parameters = self.get_parameters(api, method)
@@ -209,7 +209,7 @@ class DocumentationGenerator(object):
         return params
 
     def __build_body_parameters__(self, callback):
-        serializer_name = self.__get_serializer_class_name__(callback)
+        serializer_name = self.__get_serializer_class_name__(self.__get_request_serializer_class__(callback))
 
         if serializer_name is None:
             return
@@ -242,7 +242,7 @@ class DocumentationGenerator(object):
         Builds form parameters from the serializer class
         """
         data = []
-        serializer = self.__get_serializer_class__(callback)
+        serializer = self.__get_request_serializer_class__(callback)
 
         if serializer is None:
             return data
@@ -335,9 +335,17 @@ class DocumentationGenerator(object):
         if hasattr(callback, 'get_serializer_class'):
             return callback().get_serializer_class()
 
-    def __get_serializer_class_name__(self, callback):
-        serializer = self.__get_serializer_class__(callback)
+    def __get_response_serializer_class__(self, callback):
+        if hasattr(callback, 'response_serializer_class'):
+            return callback().response_serializer_class
+        return self.__get_serializer_class__(callback)
 
+    def __get_request_serializer_class__(self, callback):
+        if hasattr(callback, 'request_serializer_class'):
+            return callback().request_serializer_class
+        return self.__get_serializer_class__(callback)
+
+    def __get_serializer_class_name__(self, serializer):
         if serializer is None:
             return None
 
@@ -351,7 +359,7 @@ class DocumentationGenerator(object):
         serializers = set()
 
         for api in apis:
-            serializer = self.__get_serializer_class__(api['callback'])
+            serializer = self.__get_response_serializer_class__(api['callback'])
             if serializer is not None:
                 serializers.add(serializer)
 
