@@ -198,9 +198,12 @@ class DocumentationGenerator(object):
         the DRF serializer fields
         """
         params = []
+        print "api", api
         path_params = self.__build_path_parameters__(api['path'])
         body_params = self.__build_body_parameters__(api['callback'])
+        print "body", body_params
         form_params = self.__build_form_parameters__(api['callback'], method)
+        print "form", form_params
         query_params, overwrite = self.__build_query_params_from_method_docstring__(api['callback'], method)
         params += query_params
         if overwrite:
@@ -223,7 +226,8 @@ class DocumentationGenerator(object):
         return params
 
     def __build_body_parameters__(self, callback):
-        serializer_name = self.__get_serializer_class_name__(self.__get_request_serializer_class__(callback))
+        serializer_name = self.__get_serializer_class_name__(self.__get_body_serializer_class__(callback))
+        print "serializer_name", serializer_name
 
         if serializer_name is None:
             return
@@ -381,6 +385,10 @@ class DocumentationGenerator(object):
             return callback().request_serializer_class
         return self.__get_serializer_class__(callback)
 
+    def __get_body_serializer_class__(self, callback):
+        if hasattr(callback, 'body_serializer_class'):
+            return callback().body_serializer_class
+
     def __get_serializer_class_name__(self, serializer):
         if serializer is None:
             return None
@@ -395,6 +403,9 @@ class DocumentationGenerator(object):
         serializers = set()
 
         for api in apis:
+            serializer = self.__get_body_serializer_class__(api['callback'])
+            if serializer is not None:
+                serializers.add(serializer)
             serializer = self.__get_response_serializer_class__(api['callback'])
             if serializer is not None:
                 serializers.add(serializer)
