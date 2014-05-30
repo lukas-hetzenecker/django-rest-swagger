@@ -279,6 +279,9 @@ class DocumentationGenerator(object):
                 'readOnly': getattr(field, 'read_only', None),
             }
 
+            if getattr(field, 'help_text', False):
+                data[name]['description'] = getattr(field, 'help_text', '')
+
             # Min/Max values
             max_val = getattr(field, 'max_val', None)
             min_val = getattr(field, 'min_val', None)
