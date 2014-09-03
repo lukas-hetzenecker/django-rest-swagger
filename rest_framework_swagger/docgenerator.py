@@ -280,7 +280,7 @@ class DocumentationGenerator(object):
             }
 
             if hasattr(field, 'help_text'):
-                data[name]['description'] = field.help_text
+                f['description'] = field.help_text
 
             # Min/Max values
             max_val = getattr(field, 'max_val', None)
