@@ -7,6 +7,7 @@ from rest_framework.serializers import BaseSerializer
 from .introspectors import APIViewIntrospector, \
     ViewSetIntrospector, BaseMethodIntrospector, IntrospectorHelper, \
     get_resolved_value, YAMLDocstringParser
+from collections import OrderedDict
 
 
 class DocumentationGenerator(object):
@@ -114,8 +115,8 @@ class DocumentationGenerator(object):
             # no readonly fields
             w_name = "Write{serializer}".format(serializer=serializer_name)
 
-            w_properties = dict((k, v) for k, v in data['fields'].items()
-                                if k not in data['read_only'])
+            w_properties = OrderedDict((k, v) for k, v in data['fields'].items()
+                                       if k not in data['read_only'])
 
             models[w_name] = {
                 'id': w_name,
@@ -127,8 +128,8 @@ class DocumentationGenerator(object):
             # no write_only fields
             r_name = serializer_name
 
-            r_properties = dict((k, v) for k, v in data['fields'].items()
-                                if k not in data['write_only'])
+            r_properties = OrderedDict((k, v) for k, v in data['fields'].items()
+                                       if k not in data['write_only'])
 
             models[r_name] = {
                 'id': r_name,
@@ -250,7 +251,7 @@ class DocumentationGenerator(object):
             fields = serializer.get_fields()
 
         data = {
-            'fields': {},
+            'fields': OrderedDict(),
             'required': [],
             'write_only': [],
             'read_only': [],
