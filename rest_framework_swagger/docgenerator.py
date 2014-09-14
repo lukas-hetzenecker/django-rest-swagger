@@ -281,6 +281,9 @@ class DocumentationGenerator(object):
                 'readOnly': getattr(field, 'read_only', None),
             }
 
+            if hasattr(field, 'help_text'):
+                f['description'] = field.help_text
+
             # Min/Max values
             max_val = getattr(field, 'max_val', None)
             min_val = getattr(field, 'min_val', None)
@@ -291,7 +294,7 @@ class DocumentationGenerator(object):
                 f['maximum'] = max_val
 
             # ENUM options
-            if field.type_label == 'multiple choice' \
+            if field.type_label in ['multiple choice', 'choice'] \
                     and isinstance(field.choices, list):
                 f['enum'] = [k for k, v in field.choices]
 
