@@ -591,7 +591,17 @@ class YAMLDocstringParser(object):
                 pass
 
         return class_obj
-
+    
+    def load_model_class(self, model, callback):
+        """
+        Returns a model class if found.
+        """
+        try:
+            return self._load_class(model, callback)
+        except (ImportError, ValueError):
+            pass
+        return None
+    
     def get_serializer_class(self, callback):
         """
         Retrieves serializer class from YAML object

@@ -78,8 +78,17 @@ class DocumentationGenerator(object):
             response_messages = doc_parser.get_response_messages()
             parameters = doc_parser.discover_parameters(
                 inspector=method_introspector)
-
+            
             if parameters:
+                # check parameters for not registered body models
+                for parameter in parameters:
+                    if parameter['paramType'] == 'body':
+                        # attempt to load a model class for the type
+                        model_class = doc_parser.load_model_class(
+                            parameter['type'], method_introspector.callback)
+                        # make sure it is available in the swagger models
+                        if model_class is not None:
+                            self.explicit_serializers.add(model_class)
                 operation['parameters'] = parameters
 
             if response_messages:
