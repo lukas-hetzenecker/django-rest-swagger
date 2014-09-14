@@ -154,7 +154,7 @@ class DocumentationGenerator(object):
 
         Serializer might be ignored if explicitly told in docstring
         """
-        serializer = method_inspector.get_serializer_class()
+        serializer = method_inspector.get_response_serializer_class()
 
         docstring_serializer = doc_parser.get_serializer_class(
             callback=method_inspector.callback
@@ -314,5 +314,11 @@ class DocumentationGenerator(object):
         return data
 
     def _get_serializer_class(self, callback):
+        if hasattr(callback, 'get_response_serializer_class'):
+            return callback().get_response_serializer_class()
+
+        if hasattr(callback, 'response_serializer_class'):
+            return callback().response_serializer_class
+
         if hasattr(callback, 'get_serializer_class'):
             return callback().get_serializer_class()
