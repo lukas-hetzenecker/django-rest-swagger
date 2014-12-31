@@ -186,6 +186,12 @@ class BaseMethodIntrospector(object):
         parser = self.get_yaml_parser()
         serializer = parser.get_response_serializer_class(self.callback)
         if serializer is None:
+            if hasattr(self.callback, 'get_response_serializer_class'):
+                return self.callback().get_response_serializer_class()
+
+            if hasattr(self.callback, 'response_serializer_class'):
+                return self.callback().response_serializer_class
+
             serializer = self.get_serializer_class()
         return serializer
 
@@ -193,6 +199,12 @@ class BaseMethodIntrospector(object):
         parser = self.get_yaml_parser()
         serializer = parser.get_request_serializer_class(self.callback)
         if serializer is None:
+            if hasattr(self.callback, 'get_request_serializer_class'):
+                return self.callback().get_request_serializer_class()
+
+            if hasattr(self.callback, 'request_serializer_class'):
+                return self.callback().request_serializer_class
+
             serializer = self.get_serializer_class()
         return serializer
 
