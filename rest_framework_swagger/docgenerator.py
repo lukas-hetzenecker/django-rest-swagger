@@ -110,7 +110,7 @@ class DocumentationGenerator(object):
         models = {}
 
         for serializer in serializers:
-            data = self._get_serializer_fields(serializer)
+            w_data = self._get_serializer_fields(serializer, write=True)
 
             # Register 2 models with different subset of properties suitable
             # for data reading and writing.
@@ -122,21 +122,22 @@ class DocumentationGenerator(object):
             # no readonly fields
             w_name = "Write{serializer}".format(serializer=serializer_name)
 
-            w_properties = OrderedDict((k, v) for k, v in data['fields'].items()
-                                       if k not in data['read_only'])
-
+            w_properties = OrderedDict((k, v) for k, v in w_data['fields'].items()
+                                       if k not in w_data['read_only'])
             models[w_name] = {
                 'id': w_name,
-                'required': [i for i in data['required'] if i in w_properties.keys()],
+                'required': [i for i in w_data['required'] if i in w_properties.keys()],
                 'properties': w_properties,
             }
 
             # Reading
             # no write_only fields
+            r_data = self._get_serializer_fields(serializer)
+
             r_name = serializer_name
 
-            r_properties = OrderedDict((k, v) for k, v in data['fields'].items()
-                                       if k not in data['write_only'])
+            r_properties = OrderedDict((k, v) for k, v in r_data['fields'].items()
+                                       if k not in r_data['write_only'])
 
             models[r_name] = {
                 'id': r_name,
@@ -254,7 +255,7 @@ class DocumentationGenerator(object):
 
         return serializers_set
 
-    def _get_serializer_fields(self, serializer):
+    def _get_serializer_fields(self, serializer, write=False):
         """
         Returns serializer fields in the Swagger MODEL format
         """
@@ -319,7 +320,7 @@ class DocumentationGenerator(object):
             if isinstance(field, BaseSerializer):
                 field_serializer = IntrospectorHelper.get_serializer_name(field)
 
-                if getattr(field, 'write_only', False):
+                if write or getattr(field, 'write_only', False):
                     field_serializer = "Write{}".format(field_serializer)
 
                 f['type'] = field_serializer
