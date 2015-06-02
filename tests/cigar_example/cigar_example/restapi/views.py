@@ -30,6 +30,7 @@ class CigarViewSet(viewsets.ModelViewSet):
 
     serializer_class = CigarSerializer
     model = Cigar
+    queryset = Cigar.objects.all()
 
     def list(self, request, *args, **kwargs):
         """
@@ -67,13 +68,14 @@ class ArtisanCigarViewSet(viewsets.ModelViewSet):
 
     serializer_class = CigarSerializer
     model = Cigar
+    queryset = Cigar.objects.all()
 
     def list(self, request, *args, **kwargs):
         """
         Return a list of objects.
 
         """
-        return super(CigarViewSet, self).list(request, *args, **kwargs)
+        return super(ArtisanCigarViewSet, self).list(request, *args, **kwargs)
 
     @action()
     def set_price(self, request, pk):

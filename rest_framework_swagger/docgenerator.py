@@ -208,7 +208,7 @@ class DocumentationGenerator(object):
             if serializer_name is not None:
                 return serializer_name
 
-            return None
+            return 'object'
 
     def _get_serializer_set(self, apis):
         """
@@ -283,7 +283,9 @@ class DocumentationGenerator(object):
             if getattr(field, 'required', False):
                 data['required'].append(name)
 
-            data_type = get_data_type(field)
+            data_type = get_data_type(field) or 'string'
+            if data_type == 'hidden':
+                continue
 
             # guess format
             data_format = 'string'
@@ -302,6 +304,14 @@ class DocumentationGenerator(object):
                 'readOnly': getattr(field, 'read_only', None),
             }
 
+            # Swagger type is a primitive, format is more specific
+            if f['type'] == f['format']:
+                del f['format']
+
+            # defaultValue of null is not allowed, it is specific to type
+            if f['defaultValue'] is None:
+                del f['defaultValue']
+
             # Min/Max values
             max_val = getattr(field, 'max_val', None)
             min_val = getattr(field, 'min_val', None)
@@ -312,9 +322,11 @@ class DocumentationGenerator(object):
                 f['maximum'] = max_val
 
             # ENUM options
-            if get_data_type(field) == 'multiple choice' \
-                    and isinstance(field.choices, list):
-                f['enum'] = [k for k, v in field.choices]
+            if get_data_type(field) in ['multiple choice', 'choice']:
+                if isinstance(field.choices, list):
+                    f['enum'] = [k for k, v in field.choices]
+                elif isinstance(field.choices, dict):
+                    f['enum'] = [k for k, v in field.choices.items()]
 
             # Support for complex types
             if isinstance(field, BaseSerializer):

@@ -7,7 +7,7 @@ import re
 import yaml
 import importlib
 
-from .compat import OrderedDict, strip_tags
+from .compat import OrderedDict, strip_tags, get_pagination_attribures
 from abc import ABCMeta, abstractmethod
 
 from django.http import HttpRequest
@@ -16,7 +16,6 @@ from django.contrib.admindocs.utils import trim_docstring
 from django.utils.encoding import smart_text
 
 import rest_framework
-from rest_framework.views import get_view_name
 from rest_framework import viewsets
 from rest_framework.compat import apply_markdown
 from rest_framework.utils import formatting
@@ -239,7 +238,8 @@ class BaseMethodIntrospector(object):
 
     def get_nickname(self):
         """ Returns the APIView's nickname """
-        return get_view_name(self.callback).replace(' ', '_')
+        return rest_framework.settings.api_settings \
+            .VIEW_NAME_FUNCTION(self.callback, self.method).replace(' ', '_')
 
     def get_notes(self):
         """
@@ -265,6 +265,7 @@ class BaseMethodIntrospector(object):
                 method_docs
             )
             docstring += '\n' + method_docs
+        docstring = docstring.strip()
 
         return do_markdown(docstring)
 
@@ -380,7 +381,9 @@ class BaseMethodIntrospector(object):
             if getattr(field, 'read_only', False):
                 continue
 
-            data_type = get_data_type(field)
+            data_type = get_data_type(field) or 'string'
+            if data_type == 'hidden':
+                continue
 
             # guess format
             data_format = 'string'
@@ -390,12 +393,20 @@ class BaseMethodIntrospector(object):
             f = {
                 'paramType': 'form',
                 'name': name,
-                'description': getattr(field, 'help_text', ''),
+                'description': getattr(field, 'help_text', '') or '',
                 'type': data_type,
                 'format': data_format,
                 'required': getattr(field, 'required', False),
                 'defaultValue': get_default_value(field),
             }
+
+            # Swagger type is a primitive, format is more specific
+            if f['type'] == f['format']:
+                del f['format']
+
+            # defaultValue of null is not allowed, it is specific to type
+            if f['defaultValue'] is None:
+                del f['defaultValue']
 
             # Min/Max values
             max_val = getattr(field, 'max_val', None)
@@ -421,7 +432,10 @@ class BaseMethodIntrospector(object):
 def get_data_type(field):
     from rest_framework import fields
     if hasattr(field, 'type_label'):
-        return field.type_label
+        if field.type_label == 'field':
+            return 'string'
+        else:
+            return field.type_label
     elif isinstance(field, fields.BooleanField):
         return 'boolean'
     elif isinstance(field, fields.NullBooleanField):
@@ -454,8 +468,10 @@ def get_data_type(field):
         return 'file upload'
     elif isinstance(field, fields.CharField):
         return 'string'
+    elif rest_framework.VERSION >= '3.0.0' and isinstance(field, fields.HiddenField):
+        return 'hidden'
     else:
-        return 'field'
+        return 'string'
 
 
 class APIViewIntrospector(BaseViewIntrospector):
@@ -597,18 +613,16 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
         parameters = super(ViewSetMethodIntrospector, self) \
             .build_query_parameters()
         view = self.create_view()
-        if not hasattr(view, 'paginate_by'):
-            return parameters
-
-        if self.method == 'list' and view.paginate_by:
-            parameters.append({'paramType': 'query',
-                               'name': view.page_kwarg,
-                               'description': None,
-                               'dataType': 'integer'})
-
-            if hasattr(view, 'paginate_by_param') and view.paginate_by_param:
+        page_size, page_query_param, page_size_query_param = get_pagination_attribures(view)
+        if self.method == 'list' and page_size:
+            if page_query_param:
                 parameters.append({'paramType': 'query',
-                                   'name': view.paginate_by_param,
+                                   'name': page_query_param,
+                                   'description': None,
+                                   'dataType': 'integer'})
+            if page_size_query_param:
+                parameters.append({'paramType': 'query',
+                                   'name': page_size_query_param,
                                    'description': None,
                                    'dataType': 'integer'})
         return parameters

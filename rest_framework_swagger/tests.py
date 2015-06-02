@@ -1,5 +1,6 @@
 import datetime
 from mock import patch
+from distutils.version import StrictVersion
 
 from django.core.urlresolvers import RegexURLResolver, RegexURLPattern
 from django.conf import settings
@@ -80,10 +81,15 @@ class UrlParserTest(TestCase):
         self.url_patterns = patterns(
             '',
             url(r'a-view/?$', MockApiView.as_view(), name='a test view'),
+            url(r'b-view$', MockApiView.as_view(), name='a test view'),
+            url(r'c-view/$', MockApiView.as_view(), name='a test view'),
             url(r'a-view/child/?$', MockApiView.as_view()),
             url(r'a-view/child2/?$', MockApiView.as_view()),
             url(r'another-view/?$', MockApiView.as_view(),
                 name='another test view'),
+            url(r'view-with-param/(:?<ID>\d+)/?$', MockApiView.as_view(),
+                name='another test view'),
+            url(r'a-view-honky/?$', MockApiView.as_view(), name='a test view'),
         )
 
     def test_get_apis(self):
@@ -92,8 +98,22 @@ class UrlParserTest(TestCase):
         # Overwrite settings with test patterns
         urls.urlpatterns = self.url_patterns
         apis = urlparser.get_apis()
-        for api in apis:
-            self.assertIn(api['pattern'], self.url_patterns)
+        self.assertEqual(self.url_patterns[0], apis[0]['pattern'])
+        self.assertEqual('/a-view/', apis[0]['path'])
+        self.assertEqual(self.url_patterns[1], apis[1]['pattern'])
+        self.assertEqual('/b-view', apis[1]['path'])
+        self.assertEqual(self.url_patterns[2], apis[2]['pattern'])
+        self.assertEqual('/c-view/', apis[2]['path'])
+        self.assertEqual(self.url_patterns[3], apis[3]['pattern'])
+        self.assertEqual('/a-view/child/', apis[3]['path'])
+        self.assertEqual(self.url_patterns[4], apis[4]['pattern'])
+        self.assertEqual('/a-view/child2/', apis[4]['path'])
+        self.assertEqual(self.url_patterns[5], apis[5]['pattern'])
+        self.assertEqual('/another-view/', apis[5]['path'])
+        self.assertEqual(self.url_patterns[6], apis[6]['pattern'])
+        self.assertEqual('/view-with-param/{var}/', apis[6]['path'])
+        self.assertEqual(self.url_patterns[7], apis[7]['pattern'])
+        self.assertEqual('/a-view-honky/', apis[7]['path'])
 
     def test_get_apis_urlconf_import(self):
         urlparser = UrlParser()
@@ -143,6 +163,13 @@ class UrlParserTest(TestCase):
         urlparser = UrlParser()
         apis = urlparser.get_apis(self.url_patterns, filter_path="a-view")
 
+        paths = [api['path'] for api in apis]
+
+        self.assertIn("/a-view/", paths)
+        self.assertIn("/a-view/child/", paths)
+        self.assertIn("/a-view/child2/", paths)
+        self.assertNotIn("/a-view-honky/", paths)
+
         self.assertEqual(3, len(apis))
 
     def test_filter_custom(self):
@@ -168,10 +195,12 @@ class UrlParserTest(TestCase):
         class MockApiViewSet(ModelViewSet):
             serializer_class = CommentSerializer
             model = User
+            queryset = User.objects.all()
 
         class AnotherMockApiViewSet(ModelViewSet):
             serializer_class = CommentSerializer
             model = User
+            queryset = User.objects.all()
 
         router = DefaultRouter()
         router.register(r'other_views', MockApiViewSet)
@@ -212,7 +241,13 @@ class UrlParserTest(TestCase):
         apis = urlparser.get_top_level_apis(
             urlparser.get_apis(self.url_patterns))
 
-        self.assertEqual(2, len(apis))
+        self.assertIn("a-view", apis)
+        self.assertIn("b-view", apis)
+        self.assertIn("c-view", apis)
+        self.assertIn("another-view", apis)
+        self.assertIn("view-with-param", apis)
+        self.assertNotIn("a-view/child", apis)
+        self.assertNotIn("a-view/child2", apis)
 
     def test_assemble_endpoint_data(self):
         """
@@ -238,6 +273,7 @@ class UrlParserTest(TestCase):
     def test_exclude_router_api_root(self):
         class MyViewSet(ModelViewSet):
             serializer_class = CommentSerializer
+            queryset = User.objects.all()
             model = User
 
         router = DefaultRouter()
@@ -410,7 +446,6 @@ class DocumentationGeneratorTest(TestCase):
         fields = docgen._get_serializer_fields(CommentSerializer)
 
         self.assertEqual(3, len(fields['fields']))
-        self.assertEqual(fields['fields']['email']['defaultValue'], None)
 
     def test_get_serializer_fields_api_with_no_serializer(self):
         docgen = DocumentationGenerator()
@@ -700,11 +735,21 @@ class ViewSetMethodIntrospectorTests(TestCase):
             introspector.get_serializer_class())
 
     def test_builds_pagination_parameters_list(self):
-        class MyViewSet(ModelViewSet):
-            model = User
-            serializer_class = CommentSerializer
-            paginate_by = 20
-            paginate_by_param = 'page_this_by'
+        if StrictVersion(rest_framework.VERSION) >= StrictVersion('3.1.0'):
+            class MyViewSet(ModelViewSet):
+                model = User
+                serializer_class = CommentSerializer
+
+                class pagination_class:
+                    page_size = 20
+                    page_query_param = 'page'
+                    page_size_query_param = 'page_this_by'
+        else:
+            class MyViewSet(ModelViewSet):
+                model = User
+                serializer_class = CommentSerializer
+                paginate_by = 20
+                paginate_by_param = 'page_this_by'
 
         class_introspector = self.make_view_introspector(MyViewSet)
         introspector = get_introspectors(class_introspector)['list']
@@ -933,6 +978,38 @@ class BaseMethodIntrospectorTest(TestCase):
 
         self.assertEqual('CommentSerializer', params['name'])
 
+    def test_build_form_parameters_hidden_field(self):
+        if rest_framework.VERSION < '3.0.0':
+            return  # HiddenField was introduced in DRF version 3
+
+        class HiddenSerializer(serializers.Serializer):
+            content = serializers.CharField(max_length=200)
+            hidden = serializers.HiddenField(default=42)
+
+        class SerializedAPI(ListCreateAPIView):
+            serializer_class = HiddenSerializer
+
+        class_introspector = self.make_introspector2(SerializedAPI)
+        introspector = APIViewMethodIntrospector(class_introspector, 'POST')
+        params = introspector.build_form_parameters()
+
+        self.assertEqual(len(HiddenSerializer().get_fields()) - 1, len(params))
+
+        url_patterns = patterns('', url(r'my-api/', SerializedAPI.as_view()))
+        urlparser = UrlParser()
+        generator = DocumentationGenerator()
+        apis = urlparser.get_apis(url_patterns)
+        models = generator.get_models(apis)
+        self.assertIn("HiddenSerializer", models)
+        properties = models["HiddenSerializer"]['properties']
+
+        self.assertEqual("string", properties["content"]["type"])
+        self.assertNotIn("hidden", properties)
+
+        write_properties = models["WriteHiddenSerializer"]['properties']
+        self.assertEqual("string", write_properties["content"]["type"])
+        self.assertNotIn("hidden", write_properties)
+
     def test_build_form_parameters(self):
         MY_CHOICES = (
             ('val1', "Value1"),
@@ -969,7 +1046,6 @@ class BaseMethodIntrospectorTest(TestCase):
 
         self.assertEqual(len(SomeSerializer().get_fields()), len(params))
         self.assertEqual(params[0]['name'], 'email')
-        self.assertIsNone(params[0]['defaultValue'])
 
         url_patterns = patterns('', url(r'my-api/', SerializedAPI.as_view()))
         urlparser = UrlParser()
@@ -995,7 +1071,7 @@ class BaseMethodIntrospectorTest(TestCase):
         self.assertEqual("decimal", properties["decimal"]["type"])
         self.assertEqual("file upload", properties["file"]["type"])
         self.assertEqual("image upload", properties["image"]["type"])
-        self.assertEqual("field", properties["joop"]["type"])
+        self.assertEqual("string", properties["joop"]["type"])
 
     def test_build_form_parameters_allowable_values(self):
 
